@@ -1,6 +1,6 @@
-// --- FASE 2: CONEXIÓN CON FIREBASE ---
+// --- CONEXIÓN CON FIREBASE ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, getDocs, query, orderBy, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 
@@ -22,68 +22,124 @@ const auth = getAuth(app);
 const userInfoDiv = document.getElementById('user-info');
 const listaPartidosDiv = document.getElementById('lista-partidos');
 
+let currentUser = null; // Variable para guardar el estado del usuario actual
 
-// --- FASE 4: MOSTRAR PARTIDOS ---
+// --- LÓGICA DE LA APLICACIÓN ---
 
-// Esta es una función "asíncrona", lo que le permite esperar a que Firebase responda.
-async function mostrarPartidos() {
-  console.log("Buscando partidos en Firestore...");
-  // Preparamos la consulta: queremos los documentos de la colección "partidos", ordenados por fecha.
-  const partidosRef = collection(db, "partidos");
-  const q = query(partidosRef, orderBy("fecha", "asc"));
+// Función para guardar la predicción de un usuario
+async function guardarPrediccion(partidoId) {
+    if (!currentUser) {
+        alert("Debes iniciar sesión para guardar una predicción.");
+        return;
+    }
 
-  // Ejecutamos la consulta
-  const querySnapshot = await getDocs(q);
-  
-  // Vaciamos el contenido actual del div (el mensaje "Cargando...")
-  listaPartidosDiv.innerHTML = '';
+    const inputLocal = document.getElementById(`local-${partidoId}`);
+    const inputVisitante = document.getElementById(`visitante-${partidoId}`);
+    const boton = document.getElementById(`btn-${partidoId}`);
 
-  if (querySnapshot.empty) {
-    listaPartidosDiv.innerHTML = '<p>No hay partidos programados.</p>';
-    return;
-  }
+    const prediccionLocal = inputLocal.value;
+    const prediccionVisitante = inputVisitante.value;
 
-  // Recorremos cada documento (partido) que hemos recibido
-  querySnapshot.forEach((doc) => {
-    const partido = doc.data();
-    const partidoId = doc.id;
+    if (prediccionLocal === '' || prediccionVisitante === '') {
+        alert("Por favor, introduce un resultado para ambos equipos.");
+        return;
+    }
 
-    // Convertimos la fecha de Firebase a un formato legible
-    const fecha = partido.fecha.toDate();
-    const fechaFormateada = fecha.toLocaleDateString('es-ES', {
-      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
-    });
+    // Creamos un ID único para la predicción combinando el ID del partido y el del usuario
+    const prediccionId = `${partidoId}_${currentUser.uid}`;
 
-    // Creamos el HTML para la "tarjeta" del partido
-    const partidoHTML = `
-      <div class="partido-card">
-        <small>${partido.deporte} - ${fechaFormateada}</small>
-        <h3>${partido.equipoLocal} vs ${partido.equipoVisitante}</h3>
-        <p>Estado: ${partido.estado}</p>
-      </div>
-    `;
-    // Añadimos la tarjeta del partido al div
-    listaPartidosDiv.innerHTML += partidoHTML;
-  });
+    try {
+        // Guardamos la predicción en la colección "predicciones"
+        await setDoc(doc(db, "predicciones", prediccionId), {
+            userId: currentUser.uid,
+            partidoId: partidoId,
+            prediccionLocal: parseInt(prediccionLocal),
+            prediccionVisitante: parseInt(prediccionVisitante),
+            fecha: new Date() // Guardamos la fecha en que se hizo la predicción
+        });
+
+        // Damos feedback visual al usuario
+        boton.textContent = "Predicción Guardada";
+        boton.disabled = true;
+        inputLocal.disabled = true;
+        inputVisitante.disabled = true;
+
+    } catch (error) {
+        console.error("Error al guardar la predicción: ", error);
+        alert("Hubo un error al guardar tu predicción. Inténtalo de nuevo.");
+    }
 }
 
 
-// --- FASE 3: AUTENTICACIÓN DE USUARIOS ---
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    // ... (el código de login que ya teníamos)
-    userInfoDiv.innerHTML = `<p>Hola, ${user.displayName || user.email}</p><button id="logout-button">Cerrar Sesión</button>`;
-    document.getElementById('logout-button').addEventListener('click', () => signOut(auth));
-  } else {
-    // ... (el código de logout que ya teníamos)
-    userInfoDiv.innerHTML = `<button id="login-button">Iniciar Sesión con Google</button>`;
-    document.getElementById('login-button').addEventListener('click', () => {
-      const provider = new GoogleAuthProvider();
-      signInWithPopup(auth, provider);
-    });
-  }
-});
+// Función para mostrar los partidos
+async function mostrarPartidos() {
+    console.log("Buscando partidos en Firestore...");
+    const partidosRef = collection(db, "partidos");
+    const q = query(partidosRef, orderBy("fecha", "asc"));
+    const querySnapshot = await getDocs(q);
+    
+    listaPartidosDiv.innerHTML = '';
 
-// --- INICIO DE LA APLICACIÓN ---
-// Llamamos a la función para que se ejecute en cuanto cargue la página
-mostrarPartidos();
+    if (querySnapshot.empty) {
+        listaPartidosDiv.innerHTML = '<p>No hay partidos programados.</p>';
+        return;
+    }
+
+    querySnapshot.forEach((doc) => {
+        const partido = doc.data();
+        const partidoId = doc.id;
+        const fecha = partido.fecha.toDate();
+        const fechaFormateada = fecha.toLocaleDateString('es-ES', {
+            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+
+        // Solo mostramos el formulario de predicción si el usuario está logueado y el partido está pendiente
+        const formularioHTML = currentUser && partido.estado === 'Pendiente' ? `
+            <div class="prediccion-form">
+                <input type="number" min="0" id="local-${partidoId}" placeholder="Local">
+                <span>-</span>
+                <input type="number" min="0" id="visitante-${partidoId}" placeholder="Visitante">
+                <button id="btn-${partidoId}">Guardar Predicción</button>
+            </div>
+        ` : '';
+
+        const partidoHTML = `
+            <div class="partido-card">
+                <small>${partido.deporte} - ${fechaFormateada}</small>
+                <h3>${partido.equipoLocal} vs ${partido.equipoVisitante}</h3>
+                <p>Estado: ${partido.estado}</p>
+                ${formularioHTML}
+            </div>
+        `;
+        listaPartidosDiv.innerHTML += partidoHTML;
+    });
+
+    // Añadimos los event listeners a los botones después de crear el HTML
+    querySnapshot.forEach((doc) => {
+        const partido = doc.data();
+        if (currentUser && partido.estado === 'Pendiente') {
+            const partidoId = doc.id;
+            const boton = document.getElementById(`btn-${partidoId}`);
+            if(boton) {
+                boton.addEventListener('click', () => guardarPrediccion(partidoId));
+            }
+        }
+    });
+}
+
+// --- AUTENTICACIÓN DE USUARIOS ---
+onAuthStateChanged(auth, (user) => {
+    currentUser = user; // Actualizamos la variable global del usuario
+    if (user) {
+        userInfoDiv.innerHTML = `<p>Hola, ${user.displayName || user.email}</p><button id="logout-button">Cerrar Sesión</button>`;
+        document.getElementById('logout-button').addEventListener('click', () => signOut(auth));
+    } else {
+        userInfoDiv.innerHTML = `<button id="login-button">Iniciar Sesión con Google</button>`;
+        document.getElementById('login-button').addEventListener('click', () => {
+            const provider = new GoogleAuthProvider();
+            signInWithPopup(auth, provider);
+        });
+    }
+    // Volvemos a mostrar los partidos para que aparezcan/desaparezcan los formularios de predicción
+    mostrarPartidos();
+});
