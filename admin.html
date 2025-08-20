@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administrador de Partidos</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f9; color: #333; }
+        .container { background-color: white; padding: 25px 40px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 500px; margin: 20px; }
+        h1 { text-align: center; color: #2c3e50; margin-bottom: 25px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; color: #555; }
+        input, select { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box; font-size: 16px; }
+        .match-row { display: grid; grid-template-columns: 1fr 60px 15px 60px 1fr; gap: 10px; align-items: center; }
+        .vs { text-align: center; font-weight: bold; font-size: 18px; }
+        button { width: 100%; padding: 12px; background-color: #3498db; color: white; border: none; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background-color 0.3s; }
+        button:hover { background-color: #2980b9; }
+        /* Estilos para centrar el contenedor principal */
+        #app-wrapper { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    </style>
+    <script type="module" src="admin.js" defer></script>
+</head>
+<body>
+
+    <div id="app-wrapper" style="display:none;">
+        <div class="container">
+            <h1>Añadir Nuevo Partido</h1>
+            <form id="partidoForm">
+                 <div class="form-group">
+                    <label for="deporte">Deporte</label>
+                    <select id="deporte" required>
+                        <option value="Fútbol Sala">Fútbol Sala</option>
+                        <option value="Fútbol">Fútbol</option>
+                        <option value="Baloncesto">Baloncesto</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="competicion">Competición</label>
+                    <input type="text" id="competicion" placeholder="Ej: Liga Municipal Senior" required>
+                </div>
+                <div class="form-group">
+                    <label for="fecha">Fecha y Hora</label>
+                    <input type="datetime-local" id="fecha" required>
+                </div>
+                <div class="form-group">
+                    <label>Enfrentamiento y Resultado</label>
+                    <div class="match-row">
+                        <input type="text" id="equipoLocal_nombre" placeholder="Equipo Local" required>
+                        <input type="number" id="resultadoLocal" placeholder="Res.">
+                        <span class="vs">-</span>
+                        <input type="number" id="resultadoVisitante" placeholder="Res.">
+                        <input type="text" id="equipoVisitante_nombre" placeholder="Equipo Visitante" required>
+                    </div>
+                </div>
+                 <div class="form-group">
+                    <label for="estado">Estado del Partido</label>
+                    <select id="estado" required>
+                        <option value="Pendiente">Pendiente</option>
+                        <option value="Finalizado">Finalizado</option>
+                        <option value="Aplazado">Aplazado</option>
+                    </select>
+                </div>
+                <button type="submit">Guardar Partido</button>
+            </form>
+        </div>
+    </div>
+
+    
+
+</body>
+</html>
