@@ -23,44 +23,30 @@ const userInfoDiv = document.getElementById('user-info');
 const listaPartidosDiv = document.getElementById('lista-partidos');
 
 let currentUser = null;
-let userPredictions = new Map(); // Usaremos un Map para un acceso más rápido
+let userPredictions = new Map();
 
 // --- LÓGICA DE LA APLICACIÓN ---
 
 async function fetchUserPredictions(userId) {
     if (!userId) return;
-
-    // Buscamos en la colección "predicciones" los documentos cuyo userId coincida con el del usuario actual
     const q = query(collection(db, "predicciones"), where("userId", "==", userId));
     const querySnapshot = await getDocs(q);
-
-    userPredictions.clear(); // Limpiamos las predicciones anteriores
+    userPredictions.clear();
     querySnapshot.forEach((doc) => {
         const pred = doc.data();
-        // Guardamos la predicción usando el ID del partido como clave
         userPredictions.set(pred.partidoId, pred);
     });
     console.log("Predicciones del usuario cargadas:", userPredictions);
 }
 
 async function guardarPrediccion(partidoId) {
-    // ... (Esta función no cambia, es idéntica a la anterior)
-    if (!currentUser) {
-        alert("Debes iniciar sesión para guardar una predicción.");
-        return;
-    }
-
+    if (!currentUser) { return alert("Debes iniciar sesión para guardar una predicción."); }
     const inputLocal = document.getElementById(`local-${partidoId}`);
     const inputVisitante = document.getElementById(`visitante-${partidoId}`);
     const boton = document.getElementById(`btn-${partidoId}`);
-
     const prediccionLocal = inputLocal.value;
     const prediccionVisitante = inputVisitante.value;
-
-    if (prediccionLocal === '' || prediccionVisitante === '') {
-        alert("Por favor, introduce un resultado para ambos equipos.");
-        return;
-    }
+    if (prediccionLocal === '' || prediccionVisitante === '') { return alert("Por favor, introduce un resultado para ambos equipos."); }
     const prediccionId = `${partidoId}_${currentUser.uid}`;
     try {
         await setDoc(doc(db, "predicciones", prediccionId), {
@@ -74,99 +60,75 @@ async function guardarPrediccion(partidoId) {
         boton.disabled = true;
         inputLocal.disabled = true;
         inputVisitante.disabled = true;
-    } catch (error) {
-        console.error("Error al guardar la predicción: ", error);
-        alert("Hubo un error al guardar tu predicción. Inténtalo de nuevo.");
-    }
+    } catch (error) { console.error("Error al guardar la predicción: ", error); }
 }
 
 async function mostrarPartidos() {
-    console.log("Buscando partidos en Firestore...");
+    console.log("--- Iniciando mostrarPartidos ---");
+    console.log("Valor de 'currentUser' al iniciar mostrarPartidos:", currentUser);
+
     const partidosRef = collection(db, "partidos");
     const q = query(partidosRef, orderBy("fecha", "asc"));
     const querySnapshot = await getDocs(q);
-    
     listaPartidosDiv.innerHTML = '';
 
-    if (querySnapshot.empty) {
-        listaPartidosDiv.innerHTML = '<p>No hay partidos programados.</p>';
-        return;
-    }
+    if (querySnapshot.empty) { return listaPartidosDiv.innerHTML = '<p>No hay partidos programados.</p>'; }
 
     querySnapshot.forEach((doc) => {
         const partido = doc.data();
         const partidoId = doc.id;
         const fecha = partido.fecha.toDate();
-        const fechaFormateada = fecha.toLocaleDateString('es-ES', {
-            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
-        });
+        const fechaFormateada = fecha.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
         let formularioHTML = '';
         const prediccionExistente = userPredictions.get(partidoId);
 
-        // Comprobamos si el usuario está logueado y el partido está pendiente
+        console.log(`Procesando partido: ${partido.equipoLocal}`);
+        console.log(` -> ¿Hay usuario logueado? (currentUser !== null):`, !!currentUser);
+        console.log(` -> ¿El partido está pendiente?:`, partido.estado === 'Pendiente');
+        
         if (currentUser && partido.estado === 'Pendiente') {
-            // Si ya existe una predicción para este partido...
+            console.log(" -> Condición CUMPLIDA para mostrar algo.");
             if (prediccionExistente) {
-                formularioHTML = `
-                    <div class="prediccion-guardada">
-                        <p>Tu predicción: <strong>${prediccionExistente.prediccionLocal} - ${prediccionExistente.prediccionVisitante}</strong> (Guardada)</p>
-                    </div>
-                `;
-            // Si no existe, mostramos el formulario
+                formularioHTML = `<div class="prediccion-guardada"><p>Tu predicción: <strong>${prediccionExistente.prediccionLocal} - ${prediccionExistente.prediccionVisitante}</strong> (Guardada)</p></div>`;
             } else {
-                formularioHTML = `
-                    <div class="prediccion-form">
-                        <input type="number" min="0" id="local-${partidoId}" placeholder="Local">
-                        <span>-</span>
-                        <input type="number" min="0" id="visitante-${partidoId}" placeholder="Visitante">
-                        <button id="btn-${partidoId}">Guardar Predicción</button>
-                    </div>
-                `;
+                formularioHTML = `<div class="prediccion-form"><input type="number" min="0" id="local-${partidoId}" placeholder="Local"><span>-</span><input type="number" min="0" id="visitante-${partidoId}" placeholder="Visitante"><button id="btn-${partidoId}">Guardar Predicción</button></div>`;
             }
+        } else {
+            console.log(" -> Condición NO CUMPLIDA. No se mostrará formulario.");
         }
 
-        const partidoHTML = `
-            <div class="partido-card">
-                <small>${partido.deporte} - ${fechaFormateada}</small>
-                <h3>${partido.equipoLocal} vs ${partido.equipoVisitante}</h3>
-                <p>Estado: ${partido.estado}</p>
-                ${formularioHTML}
-            </div>
-        `;
+        const partidoHTML = `<div class="partido-card"><small>${partido.deporte} - ${fechaFormateada}</small><h3>${partido.equipoLocal} vs ${partido.equipoVisitante}</h3><p>Estado: ${partido.estado}</p>${formularioHTML}</div>`;
         listaPartidosDiv.innerHTML += partidoHTML;
     });
 
-    // Añadimos los event listeners a los botones (solo a los que existen)
     querySnapshot.forEach((doc) => {
         const partido = doc.data();
         if (currentUser && partido.estado === 'Pendiente' && !userPredictions.has(doc.id)) {
             const partidoId = doc.id;
             const boton = document.getElementById(`btn-${partidoId}`);
-            if(boton) {
-                boton.addEventListener('click', () => guardarPrediccion(partidoId));
-            }
+            if (boton) { boton.addEventListener('click', () => guardarPrediccion(partidoId)); }
         }
     });
 }
 
 // --- AUTENTICACIÓN DE USUARIOS ---
 onAuthStateChanged(auth, async (user) => {
+    console.log("--- onAuthStateChanged se ha disparado ---");
+    console.log("El objeto 'user' que ha llegado es:", user ? user.email : "null");
+
     currentUser = user;
     if (user) {
         userInfoDiv.innerHTML = `<p>Hola, ${user.displayName || user.email}</p><button id="logout-button">Cerrar Sesión</button>`;
         document.getElementById('logout-button').addEventListener('click', () => signOut(auth));
-        
-        // ¡NUEVO! Al iniciar sesión, cargamos las predicciones del usuario
         await fetchUserPredictions(user.uid);
-
     } else {
         userInfoDiv.innerHTML = `<button id="login-button">Iniciar Sesión con Google</button>`;
         document.getElementById('login-button').addEventListener('click', () => {
             const provider = new GoogleAuthProvider();
             signInWithPopup(auth, provider);
         });
-        userPredictions.clear(); // Limpiamos las predicciones al cerrar sesión
+        userPredictions.clear();
     }
-    mostrarPartidos(); // Volvemos a mostrar los partidos con la información actualizada
+    mostrarPartidos();
 });
