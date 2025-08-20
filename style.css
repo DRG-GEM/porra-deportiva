@@ -91,3 +91,10 @@ h2 {
     background-color: #555;
     cursor: not-allowed;
 }
+.prediccion-guardada p {
+    margin-top: 15px;
+    background-color: #3a3a3a;
+    padding: 10px;
+    border-radius: 4px;
+    color: #f0c419;
+}
