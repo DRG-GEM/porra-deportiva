@@ -16,7 +16,7 @@ const firebaseConfig = {
 // Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth(auth);
+const auth = getAuth(app); // <-- LÍNEA CORREGIDA
 
 // Referencias a elementos del HTML
 const appWrapper = document.getElementById('app-wrapper');
@@ -43,7 +43,7 @@ onAuthStateChanged(auth, (user) => {
   }
 });
 
-// Tu lógica de guardado (¡perfecta, no se cambia nada!)
+// Tu lógica de guardado
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const partido = {
@@ -51,15 +51,14 @@ form.addEventListener('submit', async (e) => {
         competicion: form.competicion.value,
         fecha: new Date(form.fecha.value),
         estado: form.estado.value,
-        equipoLocal_nombre: form.equipoLocal_nombre.value, // Asegúrate de que los nombres de campo coincidan con tu Firestore
+        equipoLocal: form.equipoLocal_nombre.value, // Cambiado para que coincida con el formulario
         resultadoLocal: form.resultadoLocal.value ? Number(form.resultadoLocal.value) : null,
-        equipoVisitante_nombre: form.equipoVisitante_nombre.value,
+        equipoVisitante: form.equipoVisitante_nombre.value, // Cambiado para que coincida con el formulario
         resultadoVisitante: form.resultadoVisitante.value ? Number(form.resultadoVisitante.value) : null,
         origenDatos: "manual"
     };
 
-    // Usaremos un ID personalizado para evitar duplicados
-    const docId = `${partido.deporte.toLowerCase().replace(' ', '')}_${new Date(partido.fecha).getTime()}`;
+    const docId = `${partido.deporte.toLowerCase().replace(/\s/g, '')}_${new Date(partido.fecha).getTime()}`;
 
     try {
         await setDoc(doc(db, "partidos", docId), partido);
