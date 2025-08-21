@@ -1,7 +1,7 @@
 // Importar las funciones necesarias de Firebase
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
 import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
-import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js";
+import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js";
 
 // Tu configuración de Firebase
 const firebaseConfig = {
@@ -22,12 +22,10 @@ const auth = getAuth(app);
 const appWrapper = document.getElementById('app-wrapper');
 const form = document.getElementById('partidoForm');
 const h1 = document.querySelector('h1');
-const loadingMessage = document.getElementById('loading-message'); // Make sure this element exists in admin.html if you use it
 
-// Comprobador de estado de autenticación
-onAuthStateChanged(auth, (user) => {
-  if (loadingMessage) loadingMessage.style.display = 'none';
-
+// --- NUEVA FUNCIÓN ---
+// Esta función centraliza la lógica de qué mostrar según el usuario
+function handleUser(user) {
   if (user) {
     // Si el usuario está logueado, comprobamos si es admin
     user.getIdTokenResult().then(idTokenResult => {
@@ -53,12 +51,24 @@ onAuthStateChanged(auth, (user) => {
     `;
     // Le damos funcionalidad a ESE botón
     document.getElementById('admin-login-button').addEventListener('click', () => {
-      signInWithPopup(auth, new GoogleAuthProvider());
+      // --- LÍNEA CORREGIDA ---
+      // Ahora, después del popup, manejamos el resultado directamente
+      signInWithPopup(auth, new GoogleAuthProvider())
+        .then((result) => {
+          // No hace falta hacer nada aquí, onAuthStateChanged se encargará del resto
+        }).catch((error) => {
+          console.error("Error en el inicio de sesión:", error);
+        });
     });
   }
+}
+
+// El oyente ahora es más simple, solo llama a nuestra nueva función
+onAuthStateChanged(auth, (user) => {
+  handleUser(user);
 });
 
-// Tu lógica de guardado
+// Tu lógica de guardado (no cambia)
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const partido = {
@@ -72,9 +82,7 @@ form.addEventListener('submit', async (e) => {
         resultadoVisitante: form.resultadoVisitante.value ? Number(form.resultadoVisitante.value) : null,
         origenDatos: "manual"
     };
-
     const docId = `${partido.deporte.toLowerCase().replace(/\s/g, '')}_${new Date(partido.fecha).getTime()}`;
-
     try {
         await setDoc(doc(db, "partidos", docId), partido);
         alert("¡Partido guardado con éxito!");
